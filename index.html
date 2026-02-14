@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Omi Pro - Fixed Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #05160d;
+            --table-color: #113d25;
+            --card-width: 60px;
+            --card-height: 85px;
+            --neon: #00ff88;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #main-frame {
+            width: 100vw; height: 100vh; max-width: 1000px; max-height: 700px;
+            background: radial-gradient(circle, var(--table-color) 0%, var(--bg-color) 100%);
+            border: 4px solid #2a5a3a; position: relative;
+            display: grid; grid-template-rows: 120px 1fr 120px; grid-template-columns: 100px 1fr 100px;
+            border-radius: 20px; box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        #lang-box {
+            position: absolute; top: 15px; left: 15px; z-index: 5000;
+            background: rgba(0,0,0,0.6); border: 1px solid var(--neon);
+            border-radius: 5px; color: white; padding: 5px 10px; cursor: pointer; font-size: 12px;
+        }
+
+        #hud {
+            position: absolute; top: 15px; right: 15px;
+            background: rgba(0, 0, 0, 0.85); padding: 10px 15px;
+            border-radius: 10px; border: 1.5px solid var(--neon);
+            z-index: 2000; color: white; min-width: 140px;
+        }
+
+        #trump-indicator {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            font-size: 180px; opacity: 0; transition: all 0.5s ease; 
+            pointer-events: none; z-index: 5; font-weight: bold;
+            text-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        #status-msg {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 255, 136, 0.95); color: black; padding: 12px 30px;
+            border-radius: 50px; font-weight: 900; z-index: 3000;
+            text-transform: uppercase; font-size: 1.2rem;
+            box-shadow: 0 0 25px var(--neon); pointer-events: none;
+            transition: opacity 0.3s; opacity: 0; text-align: center;
+        }
+
+        .player-info { position: absolute; display: flex; flex-direction: column; align-items: center; z-index: 100; transition: 0.3s; padding: 5px; border-radius: 10px; }
+        .p-top { top: 5px; left: 50%; transform: translateX(-50%); }
+        .p-left { top: 50%; left: 5px; transform: translateY(-50%); }
+        .p-right { top: 50%; right: 5px; transform: translateY(-50%); }
+        /* Bottom info removed to hide face/avatar */
+        .p-bottom { display: none; } 
+
+        .dealer-badge { border: 2px solid gold !important; box-shadow: 0 0 10px gold; }
+
+        .avatar {
+            width: 45px; height: 45px; border-radius: 50%;
+            border: 2px solid var(--neon); background: #1a1a1a;
+            display: flex; justify-content: center; align-items: center; font-size: 22px;
+        }
+        .name-tag { font-size: 11px; color: white; background: rgba(0,0,0,0.8); padding: 2px 8px; border-radius: 4px; margin-top: 3px; font-weight: bold;}
+
+        .player-area { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        #top-player { grid-area: 1 / 2 / 2 / 3; }
+        #left-player { grid-area: 2 / 1 / 3 / 2; }
+        #right-player { grid-area: 2 / 3 / 3 / 4; }
+        #bottom-player { grid-area: 3 / 2 / 4 / 3; }
+
+        #center-area {
+            grid-area: 2 / 2 / 3 / 3; background: rgba(255,255,255,0.03);
+            border-radius: 20px; margin: 15px; border: 1px dashed rgba(0,255,136,0.1);
+            position: relative; z-index: 50; display: flex; justify-content: center; align-items: center;
+        }
+
+        #trump-menu {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95); padding: 20px; border-radius: 15px;
+            border: 2px solid var(--neon); z-index: 6000; text-align: center; color: white;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+        }
+        .suit-btn {
+            font-size: 40px; margin: 10px; cursor: pointer; transition: 0.2s;
+            background: none; border: 1px solid #444; border-radius: 10px; padding: 5px 15px;
+        }
+        .suit-btn:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
+
+        .card {
+            width: var(--card-width); height: var(--card-height);
+            position: absolute; background: white; border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer; border: 1px solid #ccc; user-select: none;
+        }
+        .card.red { color: #d63031; }
+        .card.black { color: #2d3436; }
+        .card-inner { padding: 4px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; font-weight: bold; font-size: 13px; pointer-events: none; }
+        .card-back { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #1e3799, #0c2461); border: 2px solid white; border-radius: 6px; pointer-events: none; }
+        .hidden .card-inner { display: none; }
+        .visible .card-back { display: none; }
+        .suit-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; }
+
+        #start-btn { padding: 15px 40px; background: var(--neon); border: none; border-radius: 30px; font-weight: 900; cursor: pointer; box-shadow: 0 0 20px var(--neon); z-index: 4000; font-size: 1rem; transition: 0.2s; }
+        #start-btn:hover { transform: scale(1.05); }
+        .on-table { z-index: 500 !important; cursor: default !important; }
+        .hand { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        #bottom-player .card:hover { transform: translateY(-35px) scale(1.2) !important; z-index: 1000 !important; }
+    </style>
+</head>
+<body>
+
+<div id="main-frame">
+    <div id="lang-box" onclick="game.toggleLang()">සිංහල / ENG</div>
+    <div id="status-msg">OMI PRO</div>
+    
+    <div id="hud">
+        <div style="display:flex; justify-content:space-between"><span id="txt-you">ඔබ:</span> <span id="s1" style="color:var(--neon)">0</span></div>
+        <div style="display:flex; justify-content:space-between"><span id="txt-team2">පිල 2:</span> <span id="s2" style="color:#ff4757">0</span></div>
+        <div id="trump-display" style="border-top:1px solid #444; margin-top:5px; padding-top:5px; font-weight:bold; font-size:12px; text-align:center;">TRUMP: ?</div>
+    </div>
+
+    <div id="top-player" class="player-area">
+        <div class="player-info p-top" id="info-2"><div class="avatar">👴</div><div class="name-tag" id="txt-partner">Partner</div></div>
+        <div class="hand"></div>
+    </div>
+    <div id="left-player" class="player-area">
+        <div class="player-info p-left" id="info-1"><div class="avatar">👱</div><div class="name-tag">Nuwan</div></div>
+        <div class="hand"></div>
+    </div>
+    <div id="right-player" class="player-area">
+        <div class="player-info p-right" id="info-3"><div class="avatar">👳</div><div class="name-tag">Saman</div></div>
+        <div class="hand"></div>
+    </div>
+    <div id="bottom-player" class="player-area">
+        <div class="hand"></div>
+    </div>
+
+    <div id="center-area">
+        <div id="trump-indicator"></div>
+        <button id="start-btn" onclick="game.start()">DEAL CARDS</button>
+        
+        <div id="trump-menu">
+            <h3 id="txt-select-trump">Select Trump</h3>
+            <div style="margin-top:10px;">
+                <button class="suit-btn" style="color:white;" onclick="game.setTrump(0)">♠</button>
+                <button class="suit-btn" style="color:#ff4757;" onclick="game.setTrump(1)">♥</button>
+                <button class="suit-btn" style="color:#ff4757;" onclick="game.setTrump(2)">♦</button>
+                <button class="suit-btn" style="color:white;" onclick="game.setTrump(3)">♣</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUITS = [
+        { name: 'Spades', symbol: '♠', color: 'black', hex: '#ffffff' },
+        { name: 'Hearts', symbol: '♥', color: 'red', hex: '#ff4757' },
+        { name: 'Diamonds', symbol: '♦', color: 'red', hex: '#ff4757' },
+        { name: 'Clubs', symbol: '♣', color: 'black', hex: '#ffffff' }
+    ];
+    const VALUES = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+    const LANG = {
+        en: { start: "DEAL CARDS", you: "YOU:", team2: "TEAM 2:", partner: "Partner", turn: "YOUR TURN", must: "MUST FOLLOW SUIT!", win: "YOU WIN! 🎉", lost: "TEAM 2 WINS!", select: "Select Trump", dealing: "DEALING...", selecting: "SELECTING TRUMP..." },
+        si: { start: "බෙදන්න", you: "ඔබ:", team2: "පිල 2:", partner: "සගයා", turn: "ඔබේ වාරය", must: "එම වගයම දමන්න!", win: "ඔබ දිනුවා! 🎉", lost: "පිල 2 දිනුවා!", select: "තුරම්පුව තෝරන්න", dealing: "බෙදනවා...", selecting: "තුරුම්පුව තෝරනවා..." }
+    };
+
+    class Card {
+        constructor(suit, value, index) {
+            this.suit = suit; 
+            this.value = value;
+            this.rank = VALUES.indexOf(value); 
+            this.id = `card-${index}`;
+        }
+        render() {
+            const div = document.createElement('div');
+            div.className = `card ${this.suit.color === 'red' ? 'red' : 'black'} hidden`; 
+            div.id = this.id;
+            div.dataset.cardId = this.id;
+            div.innerHTML = `<div class="card-inner"><div>${this.value}<br>${this.suit.symbol}</div><div class="suit-center">${this.suit.symbol}</div><div style="align-self: flex-end; transform: rotate(180deg)">${this.value}<br>${this.suit.symbol}</div></div><div class="card-back"></div>`;
+            return div;
+        }
+    }
+
+    class Game {
+        constructor() {
+            this.players = [[], [], [], []]; 
+            this.trick = []; 
+            this.scores = [0, 0];
+            this.turn = 0; 
+            this.isBusy = false; 
+            this.currentLang = 'si';
+            this.trumpSuit = null;
+            this.leadingSuit = null;
+            this.fullDeck = [];
+            this.dealer = 3; 
+            this.trumpMaker = 0;
+            this.updateUIStrings();
+        }
+
+        toggleLang() {
+            this.currentLang = this.currentLang === 'en' ? 'si' : 'en';
+            this.updateUIStrings();
+        }
+
+        updateUIStrings() {
+            const l = LANG[this.currentLang];
+            const startBtn = document.getElementById('start-btn');
+            if(startBtn) startBtn.innerText = l.start;
+            document.getElementById('txt-you').innerText = l.you;
+            document.getElementById('txt-team2').innerText = l.team2;
+            document.getElementById('txt-partner').innerText = l.partner;
+            document.getElementById('txt-select-trump').innerText = l.select;
+        }
+
+        createDeck() {
+            let deck = []; let i = 0;
+            SUITS.forEach(s => VALUES.forEach(v => deck.push(new Card(s, v, i++))));
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        async start() {
+            if (this.isBusy) return;
+            this.isBusy = true;
+            document.getElementById('start-btn').style.display = 'none';
+            this.reset();
+            
+            this.dealer = (this.dealer + 1) % 4;
+            this.trumpMaker = (this.dealer + 1) % 4;
+            
+            document.querySelectorAll('.player-info').forEach(el => el.classList.remove('dealer-badge'));
+            const dealerInfo = document.getElementById(`info-${this.dealer}`);
+            if(dealerInfo) dealerInfo.classList.add('dealer-badge');
+
+            this.fullDeck = this.createDeck();
+            const areas = ['bottom', 'left', 'top', 'right'];
+
+            this.status(LANG[this.currentLang].dealing);
+
+            for (let round = 0; round < 4; round++) {
+                for (let i = 0; i < 4; i++) {
+                    let pIdx = (this.dealer + 1 + i) % 4;
+                    const card = this.fullDeck.shift();
+                    this.players[pIdx].push(card);
+                    const el = card.render();
+                    document.getElementById(`${areas[pIdx]}-player`).querySelector('.hand').appendChild(el);
+                    if (pIdx === 0) el.classList.replace('hidden', 'visible');
+                    this.updateLayout();
+                    await new Promise(r => setTimeout(r, 80));
+                }
+            }
+
+            this.hideStatus();
+            
+            if (this.trumpMaker === 0) {
+                document.getElementById('trump-menu').style.display = 'block';
+            } else {
+                this.status(LANG[this.currentLang].selecting);
+                setTimeout(() => this.aiSelectTrump(), 1500);
+            }
+        }
+
+        aiSelectTrump() {
+            const hand = this.players[this.trumpMaker];
+            const counts = [0, 0, 0, 0];
+            hand.forEach(c => {
+                const sIdx = SUITS.findIndex(s => s.name === c.suit.name);
+                counts[sIdx]++;
+            });
+            const bestSuitIdx = counts.indexOf(Math.max(...counts));
+            this.setTrump(bestSuitIdx);
+        }
+
+        async setTrump(suitIdx) {
+            this.trumpSuit = SUITS[suitIdx];
+            document.getElementById('trump-menu').style.display = 'none';
+            this.hideStatus();
+            
+            const ti = document.getElementById('trump-indicator');
+            const td = document.getElementById('trump-display');
+            ti.innerText = this.trumpSuit.symbol;
+            ti.style.color = this.trumpSuit.hex;
+            ti.style.opacity = "0.2"; 
+            td.innerHTML = `TRUMP: <span style="color:${this.trumpSuit.hex}">${this.trumpSuit.symbol}</span>`;
+
+            const areas = ['bottom', 'left', 'top', 'right'];
+
+            for (let round = 0; round < 4; round++) {
+                for (let i = 0; i < 4; i++) {
+                    let pIdx = (this.dealer + 1 + i) % 4;
+                    const card = this.fullDeck.shift();
+                    this.players[pIdx].push(card);
+                    const el = card.render();
+                    document.getElementById(`${areas[pIdx]}-player`).querySelector('.hand').appendChild(el);
+                    if (pIdx === 0) el.classList.replace('hidden', 'visible');
+                    this.updateLayout();
+                    await new Promise(r => setTimeout(r, 80));
+                }
+            }
+            
+            this.isBusy = false;
+            this.turn = (this.dealer + 1) % 4;
+            
+            if (this.turn === 0) {
+                this.status(LANG[this.currentLang].turn);
+                setTimeout(() => this.hideStatus(), 1000);
+            } else {
+                setTimeout(() => this.aiMove(), 600);
+            }
+        }
+
+        reset() {
+            this.players = [[], [], [], []]; 
+            this.scores = [0, 0]; this.trick = []; this.leadingSuit = null;
+            document.getElementById('s1').innerText = '0'; 
+            document.getElementById('s2').innerText = '0';
+            document.querySelectorAll('.hand').forEach(h => h.innerHTML = '');
+            document.getElementById('center-area').querySelectorAll('.card').forEach(c => c.remove());
+            const ti = document.getElementById('trump-indicator');
+            ti.innerText = ''; ti.style.opacity = "0";
+            document.getElementById('trump-display').innerText = "TRUMP: ?";
+        }
+
+        updateLayout() {
+            const areas = ['bottom', 'left', 'top', 'right'];
+            areas.forEach((area, pIdx) => {
+                const cards = document.getElementById(`${area}-player`).querySelectorAll('.card');
+                const len = cards.length;
+                cards.forEach((c, i) => {
+                    const offset = (i - (len / 2)) * 18;
+                    if (area === 'bottom' || area === 'top') {
+                        c.style.transform = `translateX(${offset}px) rotate(${(i - (len/2)) * 2}deg)`;
+                    } else {
+                        c.style.transform = `translateY(${offset}px) rotate(90deg)`;
+                    }
+                    c.style.zIndex = i;
+                });
+            });
+        }
+
+        async playCard(pIdx, cardId) {
+            if (this.isBusy || this.turn !== pIdx) return;
+            const hand = this.players[pIdx];
+            const cIdx = hand.findIndex(c => c.id === cardId);
+            if (cIdx === -1) return;
+            const card = hand[cIdx];
+
+            if (this.leadingSuit && card.suit.name !== this.leadingSuit.name) {
+                if (hand.some(c => c.suit.name === this.leadingSuit.name)) {
+                    if (pIdx === 0) {
+                        this.status(LANG[this.currentLang].must);
+                        setTimeout(() => this.hideStatus(), 1000);
+                    }
+                    return;
+                }
+            }
+
+            this.isBusy = true;
+            if (this.trick.length === 0) this.leadingSuit = card.suit;
+            this.trick.push({ player: pIdx, card: card });
+            hand.splice(cIdx, 1);
+
+            const el = document.getElementById(cardId);
+            el.classList.add('on-table');
+            el.classList.replace('hidden', 'visible');
+            document.getElementById('center-area').appendChild(el);
+            
+            const pos = [{x:0, y:50}, {x:-70, y:0}, {x:0, y:-50}, {x:70, y:0}];
+            el.style.transform = `translate(${pos[pIdx].x}px, ${pos[pIdx].y}px) rotate(${Math.random() * 20 - 10}deg)`;
+            
+            this.updateLayout();
+
+            if (this.trick.length === 4) {
+                await this.resolveTrick();
+            } else {
+                this.turn = (this.turn + 1) % 4;
+                this.isBusy = false;
+                if (this.turn !== 0) setTimeout(() => this.aiMove(), 600);
+                else {
+                    this.status(LANG[this.currentLang].turn);
+                    setTimeout(() => this.hideStatus(), 800);
+                }
+            }
+        }
+
+        aiMove() {
+            if (this.turn === 0 || this.isBusy) return;
+            const hand = this.players[this.turn];
+            if (!hand || hand.length === 0) return;
+            let options = hand.filter(c => !this.leadingSuit || c.suit.name === this.leadingSuit.name);
+            if (options.length === 0) options = hand;
+            const choice = options[Math.floor(Math.random() * options.length)];
+            this.playCard(this.turn, choice.id);
+        }
+
+        async resolveTrick() {
+            let win = this.trick[0];
+            this.trick.forEach(t => {
+                const isTrump = t.card.suit.name === this.trumpSuit.name;
+                const winTrump = win.card.suit.name === this.trumpSuit.name;
+                if (isTrump && !winTrump) win = t;
+                else if (isTrump && winTrump) { if (t.card.rank > win.card.rank) win = t; }
+                else if (!isTrump && !winTrump) { if (t.card.suit.name === this.leadingSuit.name && t.card.rank > win.card.rank) win = t; }
+            });
+
+            await new Promise(r => setTimeout(r, 1000));
+            const winningTeam = (win.player === 0 || win.player === 2) ? 0 : 1;
+            this.scores[winningTeam]++;
+            document.getElementById(`s${winningTeam + 1}`).innerText = this.scores[winningTeam];
+
+            this.trick.forEach(t => { const el = document.getElementById(t.card.id); if (el) el.remove(); });
+            this.trick = []; this.leadingSuit = null; this.turn = win.player; this.isBusy = false;
+
+            if (this.players[0].length === 0) this.endGame();
+            else if (this.turn !== 0) setTimeout(() => this.aiMove(), 500);
+            else {
+                this.status(LANG[this.currentLang].turn);
+                setTimeout(() => this.hideStatus(), 800);
+            }
+        }
+
+        endGame() {
+            const win = this.scores[0] > this.scores[1];
+            this.status(win ? LANG[this.currentLang].win : LANG[this.currentLang].lost);
+            if (win) confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            document.getElementById('start-btn').style.display = 'block';
+        }
+
+        status(m) {
+            const el = document.getElementById('status-msg');
+            el.innerText = m; el.style.opacity = "1";
+        }
+        hideStatus() { document.getElementById('status-msg').style.opacity = "0"; }
+    }
+
+    const game = new Game();
+    document.getElementById('bottom-player').addEventListener('click', (e) => {
+        const cardEl = e.target.closest('.card');
+        if (cardEl && !game.isBusy && game.turn === 0) game.playCard(0, cardEl.dataset.cardId);
+    });
+</script>
+</body>
+</html>
